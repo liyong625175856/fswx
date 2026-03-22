@@ -1,0 +1,31 @@
+/* Stitch 落地页局部样式（由 StitchHomePage 引入） */
+
+.stitch-home-page {
+  font-family: "Inter", "PingFang SC", sans-serif;
+  background-color: #f4fafd;
+  color: #161d1f;
+  min-height: 100vh;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.glass-nav {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.primary-gradient {
+  background: linear-gradient(15deg, #006d38 0%, #28c76f 100%);
+}
+
+.editorial-shadow {
+  box-shadow: 0 20px 50px rgba(22, 29, 31, 0.06);
+}
+
+/* 原 HTML 中 group-hover:primary-gradient 在 JIT 下无效，用父级 .group 悬停切换 */
+.group:hover .stitch-trust-icon {
+  background: linear-gradient(15deg, #006d38 0%, #28c76f 100%);
+  color: #fff;
+}
