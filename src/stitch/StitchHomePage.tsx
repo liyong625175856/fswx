@@ -1,11 +1,54 @@
-import type { CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
+
+import { ResultModal } from "@/components/ResultModal";
+import { runPurchaseFlow, type VipType } from "@/services/purchase";
 
 import "./stitch-home.css";
 
 const symFill: CSSProperties = { fontVariationSettings: "'FILL' 1" };
 
+const PLAN_OPTIONS: Array<{ vipType: VipType; label: string; price: number; recommended?: boolean }> = [
+  { vipType: "seasonal", label: "Seasonal 季度版", price: 59 },
+  { vipType: "yearly", label: "Yearly 年度版", price: 198, recommended: true },
+  { vipType: "half-year", label: "Half-year 半年版", price: 109 },
+  { vipType: "lifetime", label: "Lifetime 终身版", price: 498 },
+];
+const DEFAULT_PLAN = PLAN_OPTIONS[1]!;
+
 export function StitchHomePage() {
+  const [selectedPlan, setSelectedPlan] = useState<VipType>("yearly");
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [result, setResult] = useState<{ code: string; orderNo: string } | null>(null);
+
+  const currentPlan = useMemo(
+    () => PLAN_OPTIONS.find((item) => item.vipType === selectedPlan) ?? DEFAULT_PLAN,
+    [selectedPlan],
+  );
+
+  async function handlePurchase() {
+    setErrorMessage(null);
+    setIsPurchasing(true);
+    try {
+      // 购买流程在 service 层中按顺序执行：连通性检查 -> 抢码 -> 建单 -> 异常补偿回滚。
+      const res = await runPurchaseFlow({
+        vipType: currentPlan.vipType,
+        amount: currentPlan.price,
+      });
+      if (!res.ok) {
+        setErrorMessage(`${res.error.message} ${res.error.fixHint}`);
+        return;
+      }
+      setResult({ code: res.code, orderNo: res.orderNo });
+    } catch (error) {
+      console.error("[stitch-home] unexpected purchase error", error);
+      setErrorMessage("购买失败：出现未预期异常，请稍后重试。");
+    } finally {
+      setIsPurchasing(false);
+    }
+  }
+
   return (
     <div className="stitch-home-page selection:bg-primary-container selection:text-white">
       <header className="fixed top-0 z-50 w-full bg-white/80 shadow-sm backdrop-blur-xl dark:bg-slate-900/80">
@@ -155,7 +198,7 @@ export function StitchHomePage() {
               </div>
               <div className="mb-8 flex items-baseline gap-2 rounded-lg bg-surface-container-low p-6">
                 <span className="font-headline text-5xl font-extrabold tracking-tighter text-primary">
-                  ¥198
+                  ¥{currentPlan.price}
                 </span>
                 <span className="text-lg font-medium text-on-surface-variant/60 line-through">
                   ¥399
@@ -172,41 +215,40 @@ export function StitchHomePage() {
                   Select Activation Plan 选择方案
                 </label>
                 <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    className="rounded-xl border-2 border-outline-variant p-4 text-left transition-all hover:border-primary"
-                  >
-                    <span className="block text-sm font-bold">Seasonal 季度版</span>
-                    <span className="text-xs opacity-60">¥59</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="relative rounded-xl border-2 border-primary bg-primary-container/5 p-4 text-left"
-                  >
-                    <div className="absolute -right-2 -top-2 rounded-full bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-tighter text-white">
-                      Recommended
-                    </div>
-                    <span className="block text-sm font-bold text-primary">
-                      Yearly 年度版
-                    </span>
-                    <span className="text-xs text-primary/70">¥198</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-xl border-2 border-outline-variant p-4 text-left transition-all hover:border-primary"
-                  >
-                    <span className="block text-sm font-bold">Half-year 半年版</span>
-                    <span className="text-xs opacity-60">¥109</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-xl border-2 border-outline-variant p-4 text-left transition-all hover:border-primary"
-                  >
-                    <span className="block text-sm font-bold">Lifetime 终身版</span>
-                    <span className="text-xs opacity-60">¥498</span>
-                  </button>
+                  {PLAN_OPTIONS.map((plan) => {
+                    const selected = selectedPlan === plan.vipType;
+                    return (
+                      <button
+                        key={plan.vipType}
+                        type="button"
+                        onClick={() => setSelectedPlan(plan.vipType)}
+                        className={
+                          selected
+                            ? "relative rounded-xl border-2 border-primary bg-primary-container/5 p-4 text-left"
+                            : "rounded-xl border-2 border-outline-variant p-4 text-left transition-all hover:border-primary"
+                        }
+                      >
+                        {plan.recommended ? (
+                          <div className="absolute -right-2 -top-2 rounded-full bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-tighter text-white">
+                            Recommended
+                          </div>
+                        ) : null}
+                        <span className={selected ? "block text-sm font-bold text-primary" : "block text-sm font-bold"}>
+                          {plan.label}
+                        </span>
+                        <span className={selected ? "text-xs text-primary/70" : "text-xs opacity-60"}>
+                          ¥{plan.price}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+              {errorMessage ? (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {errorMessage}
+                </div>
+              ) : null}
               <div className="mb-8 flex items-center justify-between">
                 <div className="flex items-center rounded-full bg-surface-container-high p-1">
                   <button
@@ -241,10 +283,14 @@ export function StitchHomePage() {
               </div>
               <button
                 type="button"
+                onClick={() => {
+                  void handlePurchase();
+                }}
+                disabled={isPurchasing}
                 className="primary-gradient flex w-full items-center justify-center gap-3 rounded-full py-5 font-headline text-lg font-bold text-white shadow-xl shadow-primary-container/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 <span className="material-symbols-outlined">shopping_cart</span>
-                Buy Now 立即购买
+                {isPurchasing ? "购买处理中..." : "Buy Now 立即购买"}
               </button>
             </div>
           </aside>
@@ -535,14 +581,18 @@ export function StitchHomePage() {
             Yearly Plan
           </span>
           <span className="font-headline text-xl font-bold text-primary">
-            ¥198.00
+            ¥{currentPlan.price}.00
           </span>
         </div>
         <button
           type="button"
+          onClick={() => {
+            void handlePurchase();
+          }}
+          disabled={isPurchasing}
           className="primary-gradient flex-1 rounded-xl py-3 text-sm font-bold tracking-wide text-white shadow-lg"
         >
-          立即购买 Buy Now
+          {isPurchasing ? "处理中..." : "立即购买 Buy Now"}
         </button>
       </div>
 
@@ -631,6 +681,14 @@ export function StitchHomePage() {
           </div>
         </div>
       </footer>
+      <ResultModal
+        open={Boolean(result)}
+        title="购买成功"
+        description="兑换码已发放，请妥善保存。"
+        code={result?.code}
+        orderNo={result?.orderNo}
+        onClose={() => setResult(null)}
+      />
     </div>
   );
 }

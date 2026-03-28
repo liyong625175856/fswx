@@ -9,9 +9,9 @@ function serviceHint(
     if (result.error === "NOT_CONFIGURED") {
       return "Supabase 未配置：复制 .env.example 为 .env 并填写变量后可连接后端。";
     }
-    return "发码接口已预留，待接入表结构与业务逻辑。";
+    return "Supabase 已配置，但当前无法读取 dkcodes。请检查网络或 RLS 策略。";
   }
-  return "已连接（占位返回）。";
+  return `Supabase 已连接，当前可见码数量：${result.data.total ?? 0}`;
 }
 
 export function HomePage() {
